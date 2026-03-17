@@ -1,0 +1,31 @@
+# ============================================================================
+# 快闪群聊App - 开发环境Docker Compose配置
+# ============================================================================
+
+version: '3.8'
+
+services:
+  # Redis服务
+  redis:
+    image: redis:7-alpine
+    container_name: flashchat-redis-dev
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-dev-data:/data
+    command: redis-server --appendonly yes
+
+  # MongoDB服务
+  mongodb:
+    image: mongo:6
+    container_name: flashchat-mongodb-dev
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb-dev-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: flashchat
+
+volumes:
+  redis-dev-data:
+  mongodb-dev-data:

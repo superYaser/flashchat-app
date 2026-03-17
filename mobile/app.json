@@ -1,0 +1,32 @@
+{
+  "expo": {
+    "name": "快闪群聊",
+    "slug": "flashchat",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#4A90E2"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.flashchat.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
+        "backgroundColor": "#4A90E2"
+      },
+      "package": "com.flashchat.app"
+    },
+    "web": {
+      "favicon": "./assets/icon.png"
+    }
+  }
+}

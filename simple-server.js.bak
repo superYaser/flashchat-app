@@ -1,0 +1,132 @@
+/**
+ * 快闪群聊App - 简化版后端
+ */
+
+const express = require('express');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
+const Redis = require('ioredis');
+const { MongoClient } = require('mongodb');
+
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: '*', methods: ['GET', 'POST'] }
+});
+
+// Redis客户端
+const redis = new Redis({
+  host: process.env.REDIS_HOST || 'localhost',
+  port: process.env.REDIS_PORT || 6379
+});
+
+// MongoDB客户端
+let db;
+const mongoUri = process.env.MONGODB_URI || 'mongodb://localhost:27017/flashchat';
+
+// 中间件
+app.use(cors());
+app.use(express.json());
+
+// 健康检查
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: Date.now(), version: '1.0.0' });
+});
+
+// 获取群组列表
+app.get('/api/v1/groups', async (req, res) => {
+  const groups = [
+    { id: 'system_hiking', name: '徒步', type: 'system', memberCount: 12, maxMembers: 20, heatLevel: 'medium', heatColor: '#4A90E2', isSystem: true, createdAt: Date.now() },
+    { id: 'system_fishing', name: '钓鱼', type: 'system', memberCount: 8, maxMembers: 20, heatLevel: 'low', heatColor: '#999999', isSystem: true, createdAt: Date.now() },
+    { id: 'system_stock', name: '股票', type: 'system', memberCount: 15, maxMembers: 20, heatLevel: 'high', heatColor: '#F5A623', isSystem: true, createdAt: Date.now() },
+    { id: 'system_mahjong', name: '麻将', type: 'system', memberCount: 6, maxMembers: 20, heatLevel: 'low', heatColor: '#999999', isSystem: true, createdAt: Date.now() },
+    { id: 'system_parenting', name: '辅导小孩', type: 'system', memberCount: 10, maxMembers: 20, heatLevel: 'medium', heatColor: '#4A90E2', isSystem: true, createdAt: Date.now() }
+  ];
+  res.json({ code: 0, data: groups });
+});
+
+// WebSocket连接处理
+io.on('connection', (socket) => {
+  console.log('Client connected:', socket.id);
+
+  socket.on('join_home', (data) => {
+    socket.join('home');
+    socket.emit('home_init', {
+      groups: [
+        { id: 'system_hiking', name: '徒步', type: 'system', memberCount: 12, maxMembers: 20, heatLevel: 'medium', heatColor: '#4A90E2', isSystem: true },
+        { id: 'system_fishing', name: '钓鱼', type: 'system', memberCount: 8, maxMembers: 20, heatLevel: 'low', heatColor: '#999999', isSystem: true },
+        { id: 'system_stock', name: '股票', type: 'system', memberCount: 15, maxMembers: 20, heatLevel: 'high', heatColor: '#F5A623', isSystem: true },
+        { id: 'system_mahjong', name: '麻将', type: 'system', memberCount: 6, maxMembers: 20, heatLevel: 'low', heatColor: '#999999', isSystem: true },
+        { id: 'system_parenting', name: '辅导小孩', type: 'system', memberCount: 10, maxMembers: 20, heatLevel: 'medium', heatColor: '#4A90E2', isSystem: true }
+      ],
+      danmakuHistory: []
+    });
+  });
+
+  socket.on('join_group', (data) => {
+    const room = `group:${data.groupId}`;
+    socket.join(room);
+    socket.emit('group_init', {
+      group: { id: data.groupId, name: '群聊', memberCount: 1 },
+      messages: []
+    });
+  });
+
+  socket.on('send_message', (data) => {
+    const room = `group:${data.groupId}`;
+    const message = {
+      id: `msg_${Date.now()}`,
+      groupId: data.groupId,
+      sender: { id: 'user_1', name: '用户', type: 'user' },
+      content: data.content,
+      type: data.type || 'text',
+      isTruncated: false,
+      deleted: false,
+      createdAt: Date.now()
+    };
+    io.to(room).emit('group_message', { ...message, isSelf: false });
+    socket.emit('group_message', { ...message, isSelf: true });
+  });
+
+  socket.on('send_danmaku', (data) => {
+    const danmaku = {
+      id: `danmaku_${Date.now()}`,
+      content: data.content,
+      senderName: '用户',
+      track: Math.floor(Math.random() * 10),
+      duration: 8000,
+      createdAt: Date.now()
+    };
+    io.to('home').emit('danmaku', danmaku);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('Client disconnected:', socket.id);
+  });
+});
+
+// 连接MongoDB并启动服务器
+async function start() {
+  try {
+    const mongoClient = new MongoClient(mongoUri);
+    await mongoClient.connect();
+    db = mongoClient.db();
+    console.log('MongoDB connected');
+
+    const PORT = process.env.PORT || 3000;
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 FlashChat server running on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    // 即使没有MongoDB也启动服务器
+    const PORT = process.env.PORT || 3000;
+    httpServer.listen(PORT, () => {
+      console.log(`🚀 FlashChat server running on port ${PORT} (without MongoDB)`);
+    });
+  }
+}
+
+start();
+
